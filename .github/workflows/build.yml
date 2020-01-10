@@ -1,0 +1,200 @@
+name: Build and package
+
+on: [push]
+
+jobs:
+  build-macos-x86_64:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+        - host
+        - host_jar
+        - macos
+        - ios
+        - android
+        config:
+        - debug
+        - release
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      with:
+        path: darwin-x86_64_products
+        key: ${{ github.sha }}-${{ matrix.target }}-${{ matrix.config }}-macos-x86_64
+    - name: make sdist
+      run: make sdist
+    - name: make ${{ matrix.target }}_${{ matrix.config }}
+      run: make ${{ matrix.target }}_${{ matrix.config }}
+    - name: make wrap
+      run: make wrap
+
+  build-linux-x86_64:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        target:
+        - host
+        - host_jar
+        config:
+        - debug
+        - release
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      with:
+        path: linux-x86_64_products
+        key: ${{ github.sha }}-${{ matrix.target }}-${{ matrix.config }}-linux-x86_64
+    - name: make sdist
+      run: make sdist
+    - name: make ${{ matrix.target }}_${{ matrix.config }}
+      run: make ${{ matrix.target }}_${{ matrix.config }}
+    - name: make wrap
+      run: make wrap
+
+  build-linux:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        architecture:
+        - armv7
+        - armv6
+        target:
+        - host
+        - host_jar
+        config:
+        - debug
+        - release
+        include:
+        - architecture: armv7
+          uname: armv7l
+        - architecture: armv6
+          uname: armv6l
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      with:
+        path: linux-${{ matrix.uname }}_products
+        key: ${{ github.sha }}-${{ matrix.target }}-${{ matrix.config }}-linux-${{ matrix.uname }}
+    - name: make sdist
+      run: make sdist
+    - uses: uraimo/run-on-arch-action@v1.0.5
+      with:
+        architecture: ${{ matrix.architecture }}
+        distribution: stretch
+        run: |
+          set -ex
+          apt-get update
+          apt-get install -y build-essential cmake default-jdk-headless tree
+          make ${{ matrix.target }}_${{ matrix.config }}
+          make wrap
+
+  package:
+    runs-on: ubuntu-18.04
+    needs:
+    - build-macos-x86_64
+    - build-linux-x86_64
+    - build-linux
+    strategy:
+      matrix:
+        config:
+        - debug
+        - release
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Install tree
+      run: sudo apt-get update && sudo apt-get install -y tree
+    - name: make sdist
+      run: make sdist
+
+    - name: Install pretty-markdown-pdf
+      run: sudo npm install -g pretty-markdown-pdf --unsafe-perm
+    - name: Compile documentation
+      run: pretty-md-pdf -i API.md
+
+    # build-macos-x86_64
+    - name: cache host from macos-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host-${{ matrix.config }}-macos-x86_64
+        key: ${{ github.sha }}-host-${{ matrix.config }}-macos-x86_64
+    - name: cache host_jar from macos-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host_jar-${{ matrix.config }}-macos-x86_64
+        key: ${{ github.sha }}-host_jar-${{ matrix.config }}-macos-x86_64
+    - name: cache macos from macos-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/macos-${{ matrix.config }}-macos-x86_64
+        key: ${{ github.sha }}-macos-${{ matrix.config }}-macos-x86_64
+    - name: cache ios from macos-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/ios-${{ matrix.config }}-macos-x86_64
+        key: ${{ github.sha }}-ios-${{ matrix.config }}-macos-x86_64
+    - name: cache android from macos-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/android-${{ matrix.config }}-macos-x86_64
+        key: ${{ github.sha }}-android-${{ matrix.config }}-macos-x86_64
+
+    # build-linux-x86_64
+    - name: cache host from linux-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host-${{ matrix.config }}-linux-x86_64
+        key: ${{ github.sha }}-host-${{ matrix.config }}-linux-x86_64
+    - name: cache host_jar from linux-x86_64
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host_jar-${{ matrix.config }}-linux-x86_64
+        key: ${{ github.sha }}-host_jar-${{ matrix.config }}-linux-x86_64
+
+    # build-linux
+    - name: cache host from linux-armv7l
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host-${{ matrix.config }}-linux-armv7l
+        key: ${{ github.sha }}-host-${{ matrix.config }}-linux-armv7l
+    - name: cache host_jar from linux-armv7l
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host_jar-${{ matrix.config }}-linux-armv7l
+        key: ${{ github.sha }}-host_jar-${{ matrix.config }}-linux-armv7l
+    - name: cache host from linux-armv6l
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host-${{ matrix.config }}-linux-armv6l
+        key: ${{ github.sha }}-host-${{ matrix.config }}-linux-armv6l
+    - name: cache host_jar from linux-armv6l
+      uses: actions/cache@v1
+      with:
+        path: subproducts/host_jar-${{ matrix.config }}-linux-armv6l
+        key: ${{ github.sha }}-host_jar-${{ matrix.config }}-linux-armv6l
+
+    - name: Merge products
+      run: rsync -a --remove-source-files subproducts/*/ lib/
+    - name: make bdist
+      run: make bdist
+    - name: tree subproducts
+      run: tree subproducts
+    - name: tree products
+      run: tree products
+
+    - name: Find source tarball path
+      run: echo ::set-env name=TARBALL_PATH::$(echo products/*-source.tar.gz)
+    - uses: actions/upload-artifact@v1
+      with:
+        name: source tarball
+        path: ${{ env.TARBALL_PATH }}
+
+    - name: Find ${{ matrix.config }} tarball path
+      run: echo ::set-env name=TARBALL_PATH::$(echo products/*-${{ matrix.config }}.tar.gz)
+    - uses: actions/upload-artifact@v1
+      with:
+        name: ${{ matrix.config }} tarball
+        path: ${{ env.TARBALL_PATH }}

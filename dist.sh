@@ -31,8 +31,7 @@
 # (4) Merge all builds into single `products` directory and package:
 #    (4a) make dist
 
-BUILD_CONCURRENCY=
-#"-j 2"
+BUILD_CONCURRENCY="-j 2"
 OSNAME=$(uname | tr '[A-Z]' '[a-z]')
 BUILD_TMP=$(pwd)/tmp
 ANDROID_PROJ_DIR=$(pwd)/ports/android
@@ -156,7 +155,7 @@ host_jar()
     BUILD_DIR=$(pwd)/tmp/${NORMALIZED_OSNAME}-$(uname -m)-jni-$1
     UPPERCASE_CONFIG="$(tr '[:lower:]' '[:upper:]' <<< ${1:0:1})${1:1}"
     cmake -H. -B$BUILD_DIR -DCMAKE_BUILD_TYPE=$UPPERCASE_CONFIG -DSDK_JNI=ON "-DSDK_JNI=1"
-    cmake --build $BUILD_DIR $BUILD_CONCURRENCY
+    cmake --build $BUILD_DIR -- $BUILD_CONCURRENCY
     # Copy dynamic library from previous build step
     # And, remove any lib that may exist prior. We don't want accidental successes
     cd $(pwd)/ports/java
@@ -206,7 +205,7 @@ host()
     rm -rf $LIB_OUTPUT_DIR/libzt.a $LIB_OUTPUT_DIR/$DYNAMIC_LIB_NAME $LIB_OUTPUT_DIR/libztcore.a
     # Build
     cmake -H. -B$BUILD_DIR -DCMAKE_BUILD_TYPE=$1
-    cmake --build $BUILD_DIR $BUILD_CONCURRENCY
+    cmake --build $BUILD_DIR -- $BUILD_CONCURRENCY
     # Move and clean up
     mv $BUILD_DIR/bin/* $BIN_OUTPUT_DIR
     mv $BUILD_DIR/lib/* $LIB_OUTPUT_DIR

@@ -98,7 +98,7 @@ set (SILENCE "${SILENCE} -Wno-sign-compare")
 set (SILENCE "${SILENCE} -Wno-unused-variable")
 set (SILENCE "${SILENCE} -Wno-missing-field-initializers")
 set (SILENCE "${SILENCE} -Wno-unused-parameter")
-#set (SILENCE "${SILENCE} -Wno-nullability-completeness")
+set (SILENCE "${SILENCE} -Wno-nullability-completeness")
 #set (SILENCE "${SILENCE} -Wno-expansion-to-defined")
 
 set (ZT_FLAGS "${ZT_FLAGS} -DZT_USE_MINIUPNPC=1")
